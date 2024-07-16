@@ -59,8 +59,29 @@ class AntGoalInterEnv(AntEnv):
                 theta = random.random() * 2 * np.pi  # [0.0, 2pi]
                 goals.append([r * np.cos(theta), r * np.sin(theta)])
 
-        elif self.env_type == 'test' and len(self.eval_tasks_list) > 0:
-            goals = self.eval_tasks_list
+        elif self.env_type == 'test':
+
+            if len(self.eval_tasks_list) > 0:
+                goals = self.eval_tasks_list
+            else:
+                theta_list = np.array([0, 1, 2, 3, 4, 5, 6, 7]) * np.pi / 4
+                train_r_list = np.array([0.5, 1.0, 2.5, 3.0])
+                test_r_list = np.array([1.5, 2.0])
+                train_tsne_tasks_list, test_tsne_tasks_list = [], []
+
+                for r in train_r_list:
+                    for theta in theta_list:
+                        x = r * np.cos(theta)
+                        y = r * np.sin(theta)
+                        train_tsne_tasks_list.append([x, y])
+
+                for r in test_r_list:
+                    for theta in theta_list:
+                        x = r * np.cos(theta)
+                        y = r * np.sin(theta)
+                        test_tsne_tasks_list.append([x, y])
+
+                goals = train_tsne_tasks_list + test_tsne_tasks_list
 
         else:
             goals = None

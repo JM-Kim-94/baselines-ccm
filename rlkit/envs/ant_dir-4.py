@@ -59,7 +59,9 @@ class AntDir4Env(AntEnv):
             goal_dirs = [0.25 * np.pi,   0.75 * np.pi,   1.25 * np.pi,   1.75 * np.pi]    # indi, extra, extra
 
         elif self.env_type == 'tsne':
-            goal_dirs = [0.0, 0.25 * np.pi, 0.5 * np.pi, 0.75 * np.pi, np.pi, 1.25 * np.pi, 1.5 * np.pi, 1.75 * np.pi]
+            train_tsne_goal_dir = [0.0, 0.5 * np.pi, np.pi, 1.5 * np.pi]
+            test_tsne_goal_dir = [0.25 * np.pi, 0.75 * np.pi, 1.25 * np.pi, 1.75 * np.pi]
+            goal_dirs = train_tsne_goal_dir + test_tsne_goal_dir
 
         else:
             goal_dirs = None

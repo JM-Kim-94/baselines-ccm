@@ -76,7 +76,7 @@ class RandomEnv(MetaEnv, MujocoEnv):
         self.rand_params = rand_params
         self.save_parameters()
 
-    def get_one_rand_params(self, eval_mode='train', value=0):
+    def get_one_rand_params(self, eval_mode='train', value=0.0):
         new_params = {}
 
         mass_size_ = np.prod(self.model.body_mass.shape)
@@ -102,46 +102,47 @@ class RandomEnv(MetaEnv, MujocoEnv):
 
         return new_params, body_mass_multiplyers_
 
-    # def sample_tasks(self, num_train_tasks, env_type, eval_tasks_list):
-    #
-    #     train_tasks, eval_tasks = [], []
-    #     train_tasks_value, eval_tasks_value = [], []
-    #
-    #     # get_one_rand_params(self, task='inter', eval_mode='train', value=0):
-    #     """train_task"""  # [0,0.5] + [3,3.5]
-    #     for _ in range(num_train_tasks):  #
-    #         new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='train')
-    #         train_tasks.append(new_params)
-    #         train_tasks_value.append(body_mass_multiplyers_)
-    #
-    #     """eval_task"""  #
-    #     for v in eval_tasks_list:
-    #         new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='eval', value=v)
-    #         eval_tasks.append(new_params)
-    #         eval_tasks_value.append(body_mass_multiplyers_)
-    #
-    #     """total tasks list"""
-    #     param_sets = train_tasks + eval_tasks
-    #     param_sets_value_list = train_tasks_value + eval_tasks_value
-    #     return param_sets, param_sets_value_list
 
     def sample_tasks(self, num_train_tasks, env_type, eval_tasks_list):
 
-        tasks, tasks_value = [], []
-
         if env_type == "train":  # [0,0.5] + [3,3.5]
+            tasks, tasks_value = [], []
             for _ in range(num_train_tasks):  #
                 new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='train')
                 # print("body_mass_multiplyers_ in sample_tasks envtype=train : ", body_mass_multiplyers_)
                 tasks.append(new_params)
                 tasks_value.append(body_mass_multiplyers_)
 
-        elif env_type == "test" and len(eval_tasks_list) > 0:
-            for v in eval_tasks_list:
-                new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='eval', value=v)
-                # print("body_mass_multiplyers_ in sample_tasks envtype=test : ", body_mass_multiplyers_)
-                tasks.append(new_params)
-                tasks_value.append(body_mass_multiplyers_)
+        elif env_type == "test":
+            if len(eval_tasks_list) > 0:
+                tasks, tasks_value = [], []
+                for v in eval_tasks_list:
+                    new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='eval', value=v)
+                    # print("body_mass_multiplyers_ in sample_tasks envtype=test : ", body_mass_multiplyers_)
+                    tasks.append(new_params)
+                    tasks_value.append(body_mass_multiplyers_)
+            else:
+                train_tsne_tasks_list = [0.1, 0.2, 0.3, 0.4, 0.5] + [3.0, 3.1, 3.2, 3.3, 3.4, 3.5]  # 11개
+                test_tsne_tasks_list = [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9]  # 24개
+
+                train_tsne_tasks, train_tsne_tasks_value = [], []
+                """train_tsne_task"""  # 16
+                for v in train_tsne_tasks_list:
+                    new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='eval', value=v)
+                    train_tsne_tasks.append(new_params)
+                    train_tsne_tasks_value.append(body_mass_multiplyers_)
+
+                test_tsne_tasks, test_tsne_tasks_value = [], []
+                """test_tsne_task"""  # 16
+                for v in test_tsne_tasks_list:
+                    new_params, body_mass_multiplyers_ = self.get_one_rand_params(eval_mode='eval', value=v)
+                    test_tsne_tasks.append(new_params)
+                    test_tsne_tasks_value.append(body_mass_multiplyers_)
+
+                tasks = train_tsne_tasks + test_tsne_tasks
+                tasks_value = train_tsne_tasks_value + test_tsne_tasks_value
+        else:
+            tasks, tasks_value = None, None
 
         return tasks, tasks_value
 

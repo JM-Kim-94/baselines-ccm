@@ -2,7 +2,8 @@
     "env_name": "ant-goal-inter",
     "n_train_tasks": 150,
     "n_eval_tasks": 4,
-    "n_tsne_tasks": 12,
+    "n_train_tsne_tasks": 32,
+    "n_test_tsne_tasks": 16,
     
     "env_params": {
         "env_type": "train",
@@ -14,11 +15,7 @@
         "eval_tasks_list": [[1.75, 0], [0, 1.75], [-1.75, 0], [0, -1.75]]
     },
     "env_params3": {
-        "env_type": "test",
-        "num_train_tasks": 12,
-        "eval_tasks_list": [[0.5,  0], [0, 0.5 ], [-0.5,  0], [0, -0.5 ],
-                            [1.75, 0], [0, 1.75], [-1.75, 0], [0, -1.75],
-                            [2.75, 0], [0, 2.75], [-2.75, 0], [0, -2.75]]
+        "env_type": "test"
     },
 
     "algo_params": {

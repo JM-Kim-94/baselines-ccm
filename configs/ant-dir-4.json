@@ -2,8 +2,9 @@
     "env_name": "ant-dir-4개",
     "n_train_tasks": 4,
     "n_eval_tasks": 4,
-    "n_tsne_tasks": 8,
-    
+    "n_train_tsne_tasks": 4,
+    "n_test_tsne_tasks": 4,
+
     "env_params": {
         "env_type": "train",
         "num_train_tasks": 4
