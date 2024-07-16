@@ -1,0 +1,42 @@
+{
+    "env_name": "ant-dir-4개",
+    "n_train_tasks": 4,
+    "n_eval_tasks": 4,
+    "n_tsne_tasks": 8,
+    
+    "env_params": {
+        "env_type": "train",
+        "num_train_tasks": 4
+    },
+    "env_params2": {
+        "env_type": "test",
+        "num_train_tasks": 4
+    },
+    "env_params3": {
+        "env_type": "tsne",
+        "num_train_tasks": 8
+    },
+
+    "algo_params": {
+        "num_pretrain_steps_per_itr": 20000,
+
+        "num_iterations": 10000,
+        "meta_batch": 4,
+        "num_initial_steps": 2000,
+        
+        "alpha": 1,
+        
+        "num_steps_prior": 400,
+        "num_steps_posterior": 0,
+        "num_extra_rl_steps_posterior": 600,
+        "num_train_steps_per_itr": 4000,
+        "num_evals": 1,
+        "num_steps_per_eval": 600,
+        "num_exp_traj_eval": 2,
+        "embedding_batch_size": 128,
+        "embedding_mini_batch_size": 128,
+        "kl_lambda": 1.0,
+        "use_information_bottleneck": true,
+        "use_next_state": false
+    }
+}

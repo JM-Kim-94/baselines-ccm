@@ -1,0 +1,45 @@
+{
+    "env_name": "ant-goal-inter",
+    "n_train_tasks": 150,
+    "n_eval_tasks": 4,
+    "n_tsne_tasks": 12,
+    
+    "env_params": {
+        "env_type": "train",
+        "num_train_tasks": 150
+    },
+    "env_params2": {
+        "env_type": "test",
+        "num_train_tasks": 4,
+        "eval_tasks_list": [[1.75, 0], [0, 1.75], [-1.75, 0], [0, -1.75]]
+    },
+    "env_params3": {
+        "env_type": "test",
+        "num_train_tasks": 12,
+        "eval_tasks_list": [[0.5,  0], [0, 0.5 ], [-0.5,  0], [0, -0.5 ],
+                            [1.75, 0], [0, 1.75], [-1.75, 0], [0, -1.75],
+                            [2.75, 0], [0, 2.75], [-2.75, 0], [0, -2.75]]
+    },
+
+    "algo_params": {
+        "num_pretrain_steps_per_itr": 20000,
+        
+        "alpha": 1,
+
+        "num_iterations": 10000,
+        "meta_batch": 20,
+        "num_initial_steps": 2000,
+        "num_steps_prior": 800,
+        "num_steps_posterior": 0,
+        "num_extra_rl_steps_posterior": 1200,
+        "num_train_steps_per_itr": 4000,
+        "num_evals": 1,
+        "num_steps_per_eval": 600,
+        "num_exp_traj_eval": 2,
+        "embedding_batch_size": 256,
+        "embedding_mini_batch_size": 256,
+        "kl_lambda": 1.0,
+        "use_information_bottleneck": true,
+        "use_next_state": false
+    }
+}
