@@ -17,7 +17,8 @@
         "eval_tasks_list": [0.75, 1.25, 1.75, 2.25, 2.75]
     },
     "env_params3": {
-        "env_type": "test"
+        "env_type": "test",
+        "eval_tasks_list": []
     },
 
     "algo_params": {

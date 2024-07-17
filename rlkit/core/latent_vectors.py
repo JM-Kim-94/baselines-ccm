@@ -19,31 +19,31 @@ class EnvWrapper:
 
 cheetah_vel_inter = EnvWrapper(
     "cheetah-vel-inter",
-    [*range(109, 120)],
-    [*range(120, 144)],
+    [*range(0, 11)],
+    [*range(11, 35)],
     [0.1, 0.2, 0.3, 0.4, 0.5, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5],
     [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8,
      2.9]
 )
 ant_dir_4 = EnvWrapper(
     "ant-dir-4",
-    [*range(8, 12)],
-    [*range(12, 16)],
+    [*range(0, 4)],
+    [*range(4, 8)],
     [0, 0.5, 1, 1.5],
     [0.25, 0.75, 1.25, 1.75]
 )
 walker_mass_inter = EnvWrapper(
     "walker-mass-inter",
-    [*range(109, 120)],
-    [*range(120, 144)],
+    [*range(0, 11)],
+    [*range(11, 35)],
     [0.1, 0.2, 0.3, 0.4, 0.5, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5],
     [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8,
      2.9]
 )
 ant_goal_inter = EnvWrapper(
     "ant-goal-inter",
-    [*range(162, 194)],
-    [*range(194, 210)],
+    [*range(0, 32)],
+    [*range(32, 48)],
     [0.5 for _ in range(8)] + [1.0 for _ in range(8)] + [2.5 for _ in range(8)] + [3.0 for _ in range(8)],
     [1.5 for _ in range(8)] + [2.0 for _ in range(8)]
 )
@@ -77,7 +77,7 @@ class NumpyEncoder(json.JSONEncoder):
 @dataclass
 class LatentVectors:
     vectors: np.ndarray
-    indices: dict[any, list]
+    indices: list
     epoch: int
     env: EnvType
 

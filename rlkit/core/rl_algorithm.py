@@ -155,7 +155,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         wandb.init(
             # set the wandb project where this run will be logged
             entity="mlic_academic",
-            project="김정모_metaRL_new4",
+            project='김정모_metaRL_baselines',
             group=self.env_name,  # 'ccm',  # "pearl-antgoal",#self.env_name,
             name='ccm-' + self.env_name \
                  + '_exp' + self.exp_name \
@@ -165,9 +165,6 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                  + '_alpha' + str(self.alpha) \
                  + '_enctau' + str(self.encoder_tau)
         )
-
-
-
 
         # separate replay buffers for
         # - training RL update
@@ -724,14 +721,14 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         })
 
 
-    def _do_tsne_plot(self, indices, epoch):
+    def _do_tsne_plot(self, epoch):
         trials = 30
         latent_samples = []
-        indices_list = {task: [] for task in indices}
+        indices_list = [[] for _ in self.tsne_tasks]
         i = 0
 
         for trial in range(trials):
-            for task in indices:
+            for task in self.tsne_tasks:
                 _, latent_sample = self.collect_paths_exp(task, epoch, trial, wideeval=True, return_z=True)
                 latent_samples.append(latent_sample.squeeze().numpy(force=True))
                 indices_list[task].append(i)
@@ -806,7 +803,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         # if epoch % self.tsne_plot_freq == 0:
         #     self._do_tsne_eval_add_inter_plot(self.tsne_tasks, epoch)
         if epoch % self.tsne_plot_freq == 0:
-            self._do_tsne_plot(self.tsne_tasks, epoch)
+            self._do_tsne_plot(epoch)
 
 
 
