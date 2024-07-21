@@ -221,7 +221,21 @@ def deep_update_dict(fr, to):
 @click.option('--encoder_tau', default=0.005)
 @click.option('--exp_name', default='1')
 @click.option('--tsne_plot_freq', default=20)
-def main(config, gpu, seed, exp_id, ce_coeff, kl_lambda, reward_scale, alpha, encoder_tau, exp_name, tsne_plot_freq):
+@click.option('--use_ib', default=False)
+@click.option('--num_pretrain', default=20000)
+def main(config,
+         gpu,
+         seed,
+         exp_id,
+         ce_coeff,
+         kl_lambda,
+         reward_scale,
+         alpha,
+         encoder_tau,
+         exp_name,
+         tsne_plot_freq,
+         use_ib,
+         num_pretrain):
     setup_seed(seed)
     variant = default_config
     if config:
@@ -232,12 +246,14 @@ def main(config, gpu, seed, exp_id, ce_coeff, kl_lambda, reward_scale, alpha, en
     variant['exp_id'] = exp_id
     variant['seed'] = seed
     variant['algo_params']['ce_coeff'] = ce_coeff
-    variant['algo_params']['kl_lambda'] = kl_lambda
     variant['algo_params']['reward_scale'] = reward_scale
     variant['algo_params']['alpha'] = alpha
     variant['algo_params']['encoder_tau'] = encoder_tau
     variant['algo_params']['exp_name'] = exp_name
-    variant['algo_params']['tsne_plot_freq'] = tsne_plot_freq  # fsd
+    variant['algo_params']['tsne_plot_freq'] = tsne_plot_freq
+    variant['algo_params']['use_information_bottleneck'] = use_ib
+    variant['algo_params']['kl_lambda'] = kl_lambda
+    variant['algo_params']['num_pretrain_steps_per_itr'] = num_pretrain
 
 
     experiment(variant)

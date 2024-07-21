@@ -1,5 +1,8 @@
 {
     "env_name": "ant-goal-inter",
+
+    "latent_size": 20,
+
     "n_train_tasks": 150,
     "n_eval_tasks": 4,
     "n_train_tsne_tasks": 32,
@@ -19,17 +22,18 @@
     },
 
     "algo_params": {
+        "meta_episode_len": 2,
         "num_pretrain_steps_per_itr": 20000,
         
         "alpha": 1,
 
         "num_iterations": 10000,
-        "meta_batch": 20,
+        "meta_batch": 10,
         "num_initial_steps": 2000,
-        "num_steps_prior": 800,
+        "num_steps_prior": 400,
         "num_steps_posterior": 0,
-        "num_extra_rl_steps_posterior": 1200,
-        "num_train_steps_per_itr": 4000,
+        "num_extra_rl_steps_posterior": 600,
+        "num_train_steps_per_itr": 2000,
         "num_evals": 1,
         "num_steps_per_eval": 600,
         "num_exp_traj_eval": 2,

@@ -28,7 +28,20 @@ class InPlacePathSampler(object):
     def shutdown_worker(self):
         pass
 
-    def obtain_samples(self, deterministic=False, max_samples=np.inf, max_trajs=np.inf, accum_context=True, resample=1, explore=False, context=None, infer=False):
+
+    # path, num, info = self.sampler_eval.obtain_samples(deterministic=self.eval_deterministic,
+    #                                                    max_trajs=self.meta_episode_len,
+    #                                                    explore=True, infer=False,
+    #                                                    context=z_keys, accum_context=True)
+    def obtain_samples(self, deterministic=False,
+                       max_samples=np.inf,
+                       max_trajs=np.inf,
+                       accum_context=True,
+                       resample=1,
+                       explore=False,
+                       context=None,
+                       infer=False,
+                       return_z=False):
         """
         Obtains samples in the environment until either we reach either max_samples transitions or
         num_traj trajectories.
@@ -42,6 +55,7 @@ class InPlacePathSampler(object):
         n_trajs = 0
         n_success_num = 0
         success = -1
+        task_z = []
         while n_steps_total < max_samples and n_trajs < max_trajs:
 
             path = rollout(
@@ -57,10 +71,16 @@ class InPlacePathSampler(object):
             n_trajs += 1
             if infer==True:
                 self.policy.infer_posterior(self.policy.context)
+                # print("z", z)
+                task_z.append(self.policy.z)
             # don't we also want the option to resample z ever transition?
             if n_trajs % resample == 0:
                 policy.sample_z()
         if n_trajs >= 5:
             success=n_success_num/n_trajs
-        return paths, n_steps_total,dict(n_success_num=n_success_num, n_trajs=n_trajs, success=success)
+
+        if return_z:
+            return paths, n_steps_total, dict(n_success_num=n_success_num, n_trajs=n_trajs, success=success), task_z[-1]
+        else:
+            return paths, n_steps_total,dict(n_success_num=n_success_num, n_trajs=n_trajs, success=success)
 

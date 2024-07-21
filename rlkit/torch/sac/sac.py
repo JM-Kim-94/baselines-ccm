@@ -33,7 +33,7 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
             policy_pre_activation_weight=0.,
             optimizer_class=optim.Adam,
             recurrent=False,
-            use_information_bottleneck=True,
+            # use_information_bottleneck=True,
             sparse_rewards=False,
             use_next_state=True,
             soft_target_tau=1e-2,
@@ -67,7 +67,7 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
         self.cross_entropy_loss = nn.CrossEntropyLoss()
         # self.kl_lambda = kl_lambda
         # self.encoder_tau = encoder_tau
-        self.use_information_bottleneck = use_information_bottleneck
+        # self.use_information_bottleneck = use_information_bottleneck
         self.sparse_rewards = sparse_rewards
         self.use_next_state = use_next_state
         self.qf1, self.qf2, self.vf, self.qf1_exp, self.qf2_exp, self.vf_exp = nets[2:]
@@ -215,7 +215,7 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
             self._pre_take_step(indices, context, context_)
 
             # stop backprop
-            self.agent.detach_z()
+            # self.agent.detach_z()
 
     def _do_training(self, indices, exp=False):
         mb_size = self.embedding_mini_batch_size
@@ -234,13 +234,15 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
             context = self.prepare_encoder_data(obs_enc, act_enc, rewards_enc, nobs_enc)
             context_ = self.prepare_encoder_data(obs_enc_, act_enc_, rewards_enc_, nobs_enc_)
 
+            # context_, context : 같은 인다이시스에서 온 컨텍스트 배치
+
             loss_dict = self._take_step(indices, context, context_)
             if exp==True:
                 exp_loss_dict = self._take_step_exp(indices, context)
             else:
                 exp_loss_dict = None
             # stop backprop
-            self.agent.detach_z()
+            # self.agent.detach_z()
 
         return loss_dict, exp_loss_dict
 
@@ -300,13 +302,13 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
             kl_loss = self.kl_lambda * kl_div
             kl_loss.backward(retain_graph=True)
 
+        ce_loss.backward()
+        self.curl_optimizer.step()
+        self.encoder_optimizer.step()
+
         ptu.soft_update_from_to(
             self.agent.context_encoder, self.agent.context_encoder_target, self.encoder_tau  # 0.005
         )
-
-        ce_loss.backward()
-        #self.curl_optimizer.step()
-        #self.encoder_optimizer.step()
 
         num_tasks = len(indices)
         explore_reward = 0
@@ -353,8 +355,8 @@ class PEARLSoftActorCritic(MetaRLAlgorithm):
         qf_loss.backward()
         self.qf1_optimizer.step()
         self.qf2_optimizer.step()
-        self.encoder_optimizer.step()
-        self.curl_optimizer.step()
+        # self.encoder_optimizer.step()
+        # self.curl_optimizer.step()
         min_q_new_actions = self._min_q(obs, new_actions, task_z)
 
         # vf update

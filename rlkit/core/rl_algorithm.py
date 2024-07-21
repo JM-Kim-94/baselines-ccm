@@ -36,6 +36,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             tsne_tasks,
             variant,
 
+            use_information_bottleneck=True,
             log_dir="",
             num_tsne_evals=30,
             tsne_plot_freq=20,
@@ -66,7 +67,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             reward_scale=1,
             num_exp_traj_eval=1,
             update_post_train=1,
-            meta_episode_len=10,
+            meta_episode_len=2,  # 10,
             eval_deterministic=True,
             render=False,
             save_replay_buffer=False,
@@ -84,6 +85,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
 
         see default experiment config file for descriptions of the rest of the arguments
         """
+        self.use_information_bottleneck = use_information_bottleneck
         self.log_dir = log_dir
         self.num_tsne_evals = num_tsne_evals
         self.tsne_plot_freq = tsne_plot_freq
@@ -148,8 +150,22 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             max_path_length=self.max_path_length,
         )
 
+
+
+
+        ###############################
+        self.sampler_tsne = InPlacePathSampler(
+            env=env_tsne,
+            policy=agent1,
+            explore_policy=agent2,
+            max_path_length=self.max_path_length,
+        )
+        ###############################
+
         self.tsne_log_dir = f"logs/{self.env_name}/{datetime.now()}/tsne"
         os.makedirs(self.tsne_log_dir)
+
+        kl = str(self.kl_lambda) if self.use_information_bottleneck else "X"
 
         wandb.login(key="7316f79887c82500a01a529518f2af73d5520255")
         wandb.init(
@@ -160,7 +176,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             name='ccm-' + self.env_name \
                  + '_exp' + self.exp_name \
                  + '_ce' + str(self.ce_coeff) \
-                 + '_kl' + str(self.kl_lambda) \
+                 + '_kl' + kl \
                  + '_rs' + str(self.reward_scale) \
                  + '_alpha' + str(self.alpha) \
                  + '_enctau' + str(self.encoder_tau)
@@ -269,8 +285,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                         print("pretrain step {} / {}".format(pretrain_step, self.num_pretrain_steps_per_itr))
                 print('done for pretraining')
 
+            print("collect data for {} tasks".format(self.num_tasks_sample))
             for i in range(self.num_tasks_sample):
                 idx = np.random.randint(len(self.train_tasks))
+                print("idx", idx)
                 self.task_idx = idx
                 self.env.reset_task(idx)
                 self.enc_replay_buffer.task_buffers[idx].clear()
@@ -288,6 +306,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                     self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train, add_to_enc_buffer=False, explore=explore, add_to_exp_buffer=explore, add_to_buffer=False)
                     self.collect_data(self.num_extra_rl_steps_posterior, 1, self.update_post_train, add_to_enc_buffer=False, explore=False, add_to_exp_buffer=False, add_to_buffer=True)
             # Sample train tasks and compute gradient updates on parameters.
+            print("done for collect data")
 
             # losses = [[] for _ in range(4)]
             loss_dict = {"cross_entropy_loss": [],
@@ -300,6 +319,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                              "exp_policy_loss": [],
                              "exp_log_pi": []}
 
+            print("main train start")
             for train_step in range(self.num_train_steps_per_itr):
 
                 indices = np.random.choice(self.train_tasks, self.meta_batch)
@@ -318,6 +338,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
                         exp_loss_dict[key].append(0.0)
 
                 self._n_train_steps_total += 1
+            print("main train end")
 
             for key in loss_dict.keys():
                 loss_dict[key] = np.mean(loss_dict[key])
@@ -329,8 +350,10 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             self.training_mode(False)
 
             # eval
+            print("start evaluation")
             self._try_to_eval(it_, loss_dict, exp_loss_dict)
             gt.stamp('eval')
+            print("end evaluation")
 
             self._end_epoch()
 
@@ -551,42 +574,74 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             logger.save_extra_data(paths, path='eval_trajectories/task{}-epoch{}-run{}'.format(idx, epoch, run))
 
         return paths
-    def collect_paths_exp(self, idx, epoch, run, wideeval=False, explore=False, context=None, return_z=False):
+
+    def collect_paths_exp(self, idx, epoch, run, wideeval=False, explore=False, context=None, return_z=False, tsne=False):
+        # print("self.meta_episode_len", self.meta_episode_len)
         self.task_idx = idx
         if wideeval==False:
             self.env.reset_task(idx)
         else:
-            if return_z:
+            if tsne:
                 self.env_tsne.reset_task(idx)
             else:
                 self.env_eval.reset_task(idx)
 
         indices = np.random.choice(self.train_tasks, self.meta_batch)
-        self.agent.clear_z(num_tasks=len(indices))
+        self.agent.clear_z(num_tasks=len(indices))  # --> z~Normal or 1 //  ctxt=None
         paths = []
         num_transitions = 0
         num_trajs = 0
         #context = self.prepare_context(self.task_idx)
 
-        z_keys = self.agent.z
+        z_keys = self.agent.z  # z_keys~Normal or 1
         self.agent.clear_z()
         if wideeval == False:
             path, num, info = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
                                                           max_trajs=self.meta_episode_len, explore=True, infer=False, context=z_keys)
         else:
-            path, num, info = self.sampler_eval.obtain_samples(deterministic=self.eval_deterministic,
+            if tsne:
+                path, num, info = self.sampler_tsne.obtain_samples(deterministic=self.eval_deterministic,
+                                                                   max_trajs=self.meta_episode_len, explore=True, infer=False, context=z_keys)
+            else:
+                path, num, info = self.sampler_eval.obtain_samples(deterministic=self.eval_deterministic,
                                                                max_trajs=self.meta_episode_len, explore=True, infer=False, context=z_keys)
+        # """accum_context=True 이게 있어야 되는거 아님?"""
+        # if wideeval == False:
+        #     path, num, info = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
+        #                                                   max_trajs=self.meta_episode_len, explore=True, infer=False, context=z_keys, accum_context=True)
+        # else:
+        #     if tsne:
+        #         path, num, info = self.sampler_tsne.obtain_samples(deterministic=self.eval_deterministic,
+        #                                                            max_trajs=self.meta_episode_len, explore=True, infer=False, context=z_keys, accum_context=True)
+        #     else:
+        #         path, num, info = self.sampler_eval.obtain_samples(deterministic=self.eval_deterministic,
+        #                                                            max_trajs=self.meta_episode_len, explore=True, infer=False, context=z_keys, accum_context=True)
+
         num_trajs += self.meta_episode_len
         paths += path
         num_transitions += num
         self.agent.infer_posterior(self.agent.context)
         task_z = self.agent.z  # for TSNE
+
+        print("self.num_steps_per_eval", self.num_steps_per_eval)
+        print("num_transitions", num_transitions)
+
         if wideeval == False:
             path, num, info = self.sampler.obtain_samples(deterministic=self.eval_deterministic,
                                                           max_samples=self.num_steps_per_eval - num_transitions, infer=True, accum_context=True)
+            # task_z = None
         else:
-            path, num, info = self.sampler_eval.obtain_samples(deterministic=self.eval_deterministic,
-                                                               max_samples=self.num_steps_per_eval - num_transitions, infer=True, accum_context=True)
+            if tsne:
+                path, num, info = self.sampler_tsne.obtain_samples(deterministic=self.eval_deterministic,
+                                                                           max_samples=self.num_steps_per_eval - num_transitions,
+                                                                           infer=True, accum_context=True,
+                                                                           return_z=False)
+            else:
+                path, num, info = self.sampler_eval.obtain_samples(deterministic=self.eval_deterministic,
+                                                                           max_samples=self.num_steps_per_eval - num_transitions,
+                                                                           infer=True, accum_context=True,
+                                                                           return_z=False)
+        # print("task_z", task_z.shape)
         num_transitions += num
         num_trajs += 1
         paths += path
@@ -606,15 +661,18 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             return paths
 
 
-    def _do_eval(self, indices, epoch, wideeval=False):
+    def _do_eval(self, indices, epoch, wideeval=False, tsne=False):
         final_returns = []
         online_returns = []
         final_returns_last = []
         for idx in indices:
             all_rets = []
             for r in range(self.num_evals):
-                paths = self.collect_paths_exp(idx, epoch, r, wideeval=wideeval)
+                paths = self.collect_paths_exp(idx, epoch, r, wideeval=wideeval, tsne=tsne)
                 all_rets.append([eval_util.get_average_returns([p]) for p in paths])
+
+                print("paths", len(paths))
+
             final_returns_last.append(np.mean([a[-1] for a in all_rets]))
             final_returns.append(np.mean([np.mean(a) for a in all_rets]))
             # record online returns for the first n trajectories
@@ -713,11 +771,11 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         plt.imshow(distance_matrix)
         plt.colorbar()
 
-        tsne_save_path = os.path.join(self.log_dir, "tSNE_" + str(epoch) + '.png')
+        tsne_save_path = os.path.join(self.log_dir, "-tSNE_" + str(epoch) + '.png')
         plt.savefig(tsne_save_path, bbox_inches='tight')
 
         wandb.log({
-            "Eval_tsne/tSNE_EP" + str(epoch): [wandb.Image(tsne_save_path)]
+            "eval_tsne/tsne_ep" + str(epoch): [wandb.Image(tsne_save_path)]
         })
 
 
@@ -729,7 +787,7 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
 
         for trial in range(trials):
             for task in self.tsne_tasks:
-                _, latent_sample = self.collect_paths_exp(task, epoch, trial, wideeval=True, return_z=True)
+                _, latent_sample = self.collect_paths_exp(task, epoch, trial, wideeval=True, return_z=True, tsne=True)
                 latent_samples.append(latent_sample.squeeze().numpy(force=True))
                 indices_list[task].append(i)
                 i += 1
@@ -745,18 +803,19 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             self.eval_statistics = OrderedDict()
 
         ### sample trajectories from prior for debugging / visualization
-        if self.dump_eval_paths:
-            # 100 arbitrarily chosen for visualizations of point_robot trajectories
-            # just want stochasticity of z, not the policy
-            self.agent.clear_z()
-            prior_paths, _, info1 = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.max_path_length * 20,
-                                                        accum_context=False,
-                                                        resample=1)
-            logger.save_extra_data(prior_paths, path='eval_trajectories/prior-epoch{}'.format(epoch))
+        # if self.dump_eval_paths:
+        #     # 100 arbitrarily chosen for visualizations of point_robot trajectories
+        #     # just want stochasticity of z, not the policy
+        #     self.agent.clear_z()
+        #     prior_paths, _, info1 = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.max_path_length * 20,
+        #                                                 accum_context=False,
+        #                                                 resample=1)
+        #     logger.save_extra_data(prior_paths, path='eval_trajectories/prior-epoch{}'.format(epoch))
 
         ### train tasks
         # eval on a subset of train tasks for speed
         indices = np.random.choice(self.train_tasks, len(self.eval_tasks))
+        print("start train task eval on ", indices)
         eval_util.dprint('evaluating on {} train tasks'.format(len(indices)))
         ### eval train tasks with posterior sampled from the training replay buffer
         train_returns = []
@@ -766,8 +825,8 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             self.env.reset_task(idx)
             paths = []
             a_s = 0
-            for _ in range(self.num_steps_per_eval // self.max_path_length):
-                context = self.prepare_context(idx)
+            for _ in range(self.num_steps_per_eval // self.max_path_length):  # 600//200 3
+                context = self.prepare_context(idx)  # ~ enc_buffer
                 self.agent.infer_posterior(context)
                 p, _, info = self.sampler.obtain_samples(deterministic=self.eval_deterministic, max_samples=self.max_path_length,
                                                         accum_context=False,
@@ -786,24 +845,36 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
             train_suc.append(a_s)
             #print(train_returns)
         train_returns = np.mean(train_returns)
+        print("train_returns", train_returns)
         train_suc = np.mean(train_suc)
         #print(train_returns)
+
+        print("start train task evaluation")
         ### eval train tasks with on-policy data to match eval of test tasks
         train_final_returns, train_online_returns, train_final_returns_last = self._do_eval(indices, epoch)
         eval_util.dprint('train online returns')
         eval_util.dprint(train_online_returns)
 
+        print("start test task evaluation")
         ### test tasks
         eval_util.dprint('evaluating on {} test tasks'.format(len(self.eval_tasks)))
         test_final_returns, test_online_returns, test_final_returns_last = self._do_eval(self.eval_tasks, epoch, wideeval=True)
         eval_util.dprint('test online returns')
         eval_util.dprint(test_online_returns)
 
+
+
         """TSNE"""
-        # if epoch % self.tsne_plot_freq == 0:
-        #     self._do_tsne_eval_add_inter_plot(self.tsne_tasks, epoch)
         if epoch % self.tsne_plot_freq == 0:
+            # print("my tsne plot")
+            # self._do_tsne_eval_add_inter_plot(self.tsne_tasks, epoch)
+            # # if epoch % self.tsne_plot_freq == 0:
+            self.traintask_tsne(self.eval_tasks, epoch)
+
+            print("wide tsne plot")
             self._do_tsne_plot(epoch)
+
+            print("tsne plot end")
 
 
 
@@ -831,10 +902,15 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
         logger.save_extra_data(avg_test_online_return, path='online-test-epoch{}'.format(epoch))
 
         wandb_log_dict = {
-            "Eval/train_avg_return": avg_train_return_last,
-            "Eval/test_avg_return": avg_test_return_last,
+            "Eval/train_avg_return": avg_train_return,  # avg_train_return_last,
+            "Eval/test_avg_return": avg_test_return,  # avg_test_return_last,
             # "Eval/train_avg_return": avg_train_return,
             # "Eval/test_avg_return": avg_test_return,
+            "AverageTrainReturn_all_train_tasks": train_returns,
+            "AverageReturn_all_train_tasks": avg_train_return,
+            "AverageReturn_all_test_tasks": avg_test_return,
+            "AverageReturn_all_train_tasks_last": avg_train_return_last,
+            "AverageReturn_all_test_tasks_last": avg_test_return_last,
         }
         wandb_log_dict.update(loss_dict)
         wandb_log_dict.update(exp_loss_dict)
@@ -851,6 +927,107 @@ class MetaRLAlgorithm(metaclass=abc.ABCMeta):
 
         if self.plotter:
             self.plotter.draw()
+
+    def traintask_tsne(self, indices, epoch):
+        # indices = np.random.choice(self.train_tasks, len(self.eval_tasks))
+        z_list = []
+        for idx in indices:
+            for r in range(30):  # 600//200 3
+                # context = self.prepare_context(idx)  # ~ enc_buffer
+                # self.agent.infer_posterior(context)
+                # z_list.append(self.agent.z)
+
+                paths, z = self.collect_paths_exp(idx, epoch, r, wideeval=True, return_z=True)
+                z = z.view(-1, ).detach().cpu().numpy()  # z (10,)
+                z_list.append(z)
+
+
+        plt.figure(figsize=(12, 5))
+
+        z_total_list = [[] for _ in range(len(indices))]  # z tsne에 필요
+        z_list = []  # 디스턴스 매트릭스 계산시 필요
+        for label, task_idx in enumerate(indices):
+
+            one_task_z_ = []
+            for run in range(self.num_tsne_evals):  # 30번
+                context = self.prepare_context(task_idx)  # ~ enc_buffer
+                self.agent.infer_posterior(context)
+                z = self.agent.z
+                z = z.view(-1, ).detach().cpu().numpy()  # z (10,)
+
+                z_total_list[label].append(z)
+                one_task_z_.append(z)  # 디스턴스 매트릭스 계산시
+            z_list.append(sum(one_task_z_) / len(one_task_z_))  # 디스턴스 매트릭스 계산시 필요
+
+        distance_matrix = self.get_l2_distance_matrix(z_list)
+
+        z_total_list_flatten = []
+        for i in range(len(z_total_list)):  # 17
+            for j in range(len(z_total_list[i])):
+                z_total_list_flatten.append(z_total_list[i][j])
+
+        indices_list = [range(i * self.num_tsne_evals, (i + 1) * self.num_tsne_evals) for i in range(len(z_total_list))]
+
+        tsne_model = TSNE(n_components=2, random_state=0, perplexity=50, n_jobs=4)
+        result = tsne_model.fit_transform(np.array(z_total_list_flatten))
+
+        if self.env_name == "cheetah-vel-inter":
+            tsne_tasks_lst = ["0.1(c0)", "0.25(c1)", "0.75(c2)", "1.25(c3)",
+                              "1.75(c4)", "2.25(c5)", "2.75(c6)", "3.1(c7)", "3.25(c8)"]
+            marker_list = ["$c_0$", "$c_1$", "$c_2$", "$c_3$", "$c_4$", "$c_5$", "$c_6$", "$c_7$", "$c_8$"]
+
+        elif self.env_name == "ant-goal-inter":
+            # [[1.75, 0], [0, 1.75], [-1.75, 0], [0, -1.75]]
+            tsne_tasks_lst = ["[1.75, 0]c0", "[0, 1.75]c1", "[-1.75, 0]c2", "[0, -1.75]c3"]
+            marker_list = ["$c_0$", "$c_1$", "$c_2$", "$c_3$"]
+
+        elif self.env_name == "ant-dir-4개":
+            tsne_tasks_lst = ["0pi c0", "1/4pi c1", "2/4pic2", "3/4pi c3",
+                              "4/4pi c4", "5/4pi c5", "6/4pi c6", "7/4pi c7"]
+            marker_list = ["$c_0$", "$c_1$", "$c_2$", "$c_3$", "$c_4$", "$c_5$", "$c_6$", "$c_7$"]
+
+        elif self.env_name == "ant-dir-2개":
+            tsne_tasks_lst = ["0pi c0", "1/4pi c1", "2/4pic2", "3/4pi c3", "7/4pi c4"]
+            marker_list = ["$c_0$", "$c_1$", "$c_2$", "$c_3$", "$c_4$"]
+
+        elif "mass" in self.env_name or "params" in self.env_name:
+            tsne_tasks_lst = ["c" + str(i) for i in range(len(self.tsne_tasks))]
+            marker_list = ["$c_{" + str(i) + "}$" for i in range(len(self.tsne_tasks))]
+
+        else:
+            tsne_tasks_lst, marker_list = None, None
+
+        plt.subplot(121)
+        for i in range(len(z_total_list)):
+            plt.scatter(result[:, 0][indices_list[i]],
+                        result[:, 1][indices_list[i]],
+                        s=100, marker=marker_list[i],  # c=colors[i], # 's',
+                        # alpha=0.02, edgecolor='k',
+                        label=str(tsne_tasks_lst[i]))
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.title("Task latent variable(c) T-SNE plot")
+
+        plt.subplot(122)
+        for i in range(len(distance_matrix)):
+            text = 'c_' + str(i)
+            plt.text(i, -0.7, text, rotation=90)
+            plt.text(-1.5, i, text)
+        plt.gca().axes.xaxis.set_visible(False)
+        plt.gca().axes.yaxis.set_visible(False)
+        plt.imshow(distance_matrix)
+        plt.colorbar()
+
+        tsne_save_path = os.path.join(self.log_dir, "-tSNE_" + str(epoch) + '.png')
+        # plt.savefig(tsne_save_path, bbox_inches='tight')
+        plt.savefig(tsne_save_path)
+
+        wandb.log({
+            "eval_tsne/tsne_ep" + str(epoch): [wandb.Image(tsne_save_path)]
+        })
+
+
+
+
 
     @abc.abstractmethod
     def training_mode(self, mode):

@@ -5,6 +5,14 @@ import rlkit.torch.pytorch_util as ptu
 reward_weight = 1
 
 
+
+
+
+# while n_steps_total < max_samples and n_trajs < max_trajs:
+#     path = rollout(
+#         self.env, policy, explore_policy, max_path_length=self.max_path_length, accum_context=accum_context,
+#         explore=explore, context=context)
+
 def rollout(env, agent, exploration_agent, max_path_length=np.inf, accum_context=True, resample_z=False, animated=False, save_frames=False,
             explore=False, context=None, rsample=1):
     """
@@ -69,6 +77,7 @@ def rollout(env, agent, exploration_agent, max_path_length=np.inf, accum_context
         else:
             r_e = r
         if explore==False and accum_context:
+            # print("accum_context")
             agent.update_context([o, a, r, next_o, d, env_info])
         ####TODO
         if explore:
